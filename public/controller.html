@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Controller</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body { text-align: center; }
+        button { font-size: 24px; padding: 15px; margin: 10px; }
+    </style>
+</head>
+<body>
+    <h2>Control 3D Model</h2>
+    <button onclick="sendMove('up')">⬆️</button><br>
+    <button onclick="sendMove('left')">⬅️</button>
+    <button onclick="sendMove('right')">➡️</button><br>
+    <button onclick="sendMove('down')">⬇️</button>
+
+    <script>
+        const socket = io();
+
+        function sendMove(direction) {
+            socket.emit("move", { direction });
+        }
+    </script>
+</body>
+</html>
+

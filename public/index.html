@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Start 3D</title>
+</head>
+<body style="text-align: center; margin-top: 100px;">
+  <h2>Scan this QR Code to control the 3D Model</h2>
+  <img src="/qr.png" alt="QR Code" width="200"><br><br>
+  <button onclick="start3D()">Start 3D</button>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+
+    function start3D() {
+      socket.emit("start-3d");
+      window.location.href = "/loadModel.html";
+    }
+
+    // ✅ Tự động chuyển trang nếu có thiết bị mobile gửi "move"
+    socket.on("mobile-connected", () => {
+      console.log("📱 Mobile device connected. Switching to 3D viewer...");
+      window.location.href = "/loadModel.html";
+    });
+  </script>
+</body>
+</html>
+
