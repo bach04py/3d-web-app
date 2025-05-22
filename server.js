@@ -10,7 +10,7 @@ const io = socketIo(server);
 
 // === Cấu hình PORT và URL ===
 const PORT = process.env.PORT || 3000;
-const serverUrl = process.env.SERVER_URL || `http://localhost:${PORT}`;
+const serverUrl = 'https://threed-web-app-1.onrender.com'; // ✅ sửa lỗi dấu nháy
 
 // === Tạo mã QR trỏ đến giao diện điều khiển ===
 const controllerUrl = `${serverUrl}/controller.html`;
