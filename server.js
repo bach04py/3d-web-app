@@ -28,12 +28,17 @@ app.use("/models", express.static("models"));
 
 // === Routes ===
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "loadModel.html")); // PC Viewer
+  const userAgent = req.headers["user-agent"];
+  const isMobile = /mobile/i.test(userAgent);
+  if (isMobile) {
+    // Nếu là thiết bị di động, chuyển sang trang controller
+    res.redirect("/controller.html");
+  } else {
+    // Nếu là máy tính, load viewer
+    res.sendFile(path.join(__dirname, "public", "loadModel.html"));
+  }
 });
 
-app.get("/controller.html", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "controller.html")); // Mobile Controller
-});
 
 // === Socket.io ===
 let controllerSocketId = null;

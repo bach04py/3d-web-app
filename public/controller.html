@@ -1,29 +1,70 @@
+<!-- public/controller.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Controller</title>
-    <script src="/socket.io/socket.io.js"></script>
-    <style>
-        body { text-align: center; }
-        button { font-size: 24px; padding: 15px; margin: 10px; }
-    </style>
+  <meta charset="UTF-8" />
+  <title>Mobile Controller</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      background-color: #111;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(3, 80px);
+      grid-gap: 10px;
+      margin-top: 20px;
+    }
+
+    button {
+      padding: 20px;
+      font-size: 16px;
+      background-color: #333;
+      color: white;
+      border: none;
+      border-radius: 8px;
+    }
+
+    button:active {
+      background-color: #666;
+    }
+  </style>
 </head>
 <body>
-    <h2>Control 3D Model</h2>
-    <button onclick="sendMove('up')">⬆️</button><br>
+  <h2>🎮 Mobile Controller</h2>
+
+  <div class="controls">
+    <button onclick="sendMove('rotateLeft')">⟲</button>
+    <button onclick="sendMove('up')">⬆️</button>
+    <button onclick="sendMove('rotateRight')">⟳</button>
+
     <button onclick="sendMove('left')">⬅️</button>
-    <button onclick="sendMove('right')">➡️</button><br>
+    <button onclick="sendMove('forward')">⬆️🚶</button>
+    <button onclick="sendMove('right')">➡️</button>
+
+    <button onclick="sendMove('backward')">⬇️🚶</button>
     <button onclick="sendMove('down')">⬇️</button>
+  </div>
 
-    <script>
-        const socket = io();
+  <script>
+    const socket = io();
 
-        function sendMove(direction) {
-            socket.emit("move", { direction });
-        }
-    </script>
+    // Gửi định danh là controller
+    socket.emit("identify", "controller");
+
+    function sendMove(direction) {
+      socket.emit("move", direction);
+    }
+  </script>
 </body>
 </html>
 
