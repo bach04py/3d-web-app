@@ -63,6 +63,9 @@
     // ✅ Kết nối bằng socket.io
     const socket = io();
 
+    // 🖥️ Thông báo đây là viewer
+    socket.emit("identify", "viewer");
+
     socket.on("move", (dir) => {
       useMobileControl = true;
       handleMobileInput(dir);
