@@ -6,6 +6,7 @@
 
   <!-- Three.js -->
   <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/MTLLoader.js"></script>
   <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
 
   <!-- Socket.IO Client -->
@@ -28,7 +29,7 @@
   </style>
 </head>
 <body>
-  <div id="status">�� Waiting for controller...</div>
+  <div id="status">🔄 Waiting for controller...</div>
 
   <script>
     let camera, scene, renderer;
@@ -48,18 +49,36 @@
 
       renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.setClearColor(0x000000);
       document.body.appendChild(renderer.domElement);
 
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
-      directionalLight.position.set(10, 10, 10);
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+      directionalLight.position.set(5, 10, 7.5);
+      directionalLight.castShadow = true;
       scene.add(ambientLight, directionalLight);
 
-      const loader = new THREE.OBJLoader();
-      loader.load("/models/building_04.obj", function (obj) {
-        model = obj;
-        model.position.set(0, -1, 0);
-        scene.add(model);
+      // Load materials then model
+      const mtlLoader = new THREE.MTLLoader();
+      mtlLoader.setPath("/models/");
+      mtlLoader.load("building_04.mtl", function (materials) {
+        materials.preload();
+
+        const objLoader = new THREE.OBJLoader();
+        objLoader.setMaterials(materials);
+        objLoader.setPath("/models/");
+        objLoader.load("building_04.obj", function (obj) {
+          model = obj;
+          model.traverse((child) => {
+            if (child.isMesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+            }
+          });
+          model.position.set(0, -1, 0);
+          scene.add(model);
+        });
       });
 
       window.addEventListener("resize", () => {
@@ -71,9 +90,7 @@
       window.addEventListener("keydown", (e) => keys.add(e.key.toLowerCase()));
       window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
 
-      // Kết nối socket.io
       const socket = io();
-
       socket.emit("identify", "viewer");
 
       socket.on("move", (dir) => {
@@ -92,14 +109,14 @@
       const moveSpeed = 0.2;
       const rotateSpeed = 3;
 
-      if (dir === "up")    camera.position.y += moveSpeed;
-      if (dir === "down")  camera.position.y -= moveSpeed;
-      if (dir === "left")  camera.position.x -= moveSpeed;
+      if (dir === "up") camera.position.y += moveSpeed;
+      if (dir === "down") camera.position.y -= moveSpeed;
+      if (dir === "left") camera.position.x -= moveSpeed;
       if (dir === "right") camera.position.x += moveSpeed;
-      if (dir === "forward")  camera.position.z -= moveSpeed;
+      if (dir === "forward") camera.position.z -= moveSpeed;
       if (dir === "backward") camera.position.z += moveSpeed;
 
-      if (dir === "rotateLeft")  rotation.y -= rotateSpeed;
+      if (dir === "rotateLeft") rotation.y -= rotateSpeed;
       if (dir === "rotateRight") rotation.y += rotateSpeed;
 
       camera.rotation.y = THREE.MathUtils.degToRad(rotation.y);
@@ -111,9 +128,9 @@
       const moveSpeed = 0.1;
       const rotateSpeed = 2;
 
-      if (keys.has("arrowup"))    camera.position.y += moveSpeed;
-      if (keys.has("arrowdown"))  camera.position.y -= moveSpeed;
-      if (keys.has("arrowleft"))  camera.position.x -= moveSpeed;
+      if (keys.has("arrowup")) camera.position.y += moveSpeed;
+      if (keys.has("arrowdown")) camera.position.y -= moveSpeed;
+      if (keys.has("arrowleft")) camera.position.x -= moveSpeed;
       if (keys.has("arrowright")) camera.position.x += moveSpeed;
       if (keys.has("w")) camera.position.z -= moveSpeed;
       if (keys.has("s")) camera.position.z += moveSpeed;
