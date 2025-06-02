@@ -1,70 +1,52 @@
-<!-- public/controller.html -->
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>Mobile Controller</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-  <style>
-    body {
-      font-family: sans-serif;
-      background-color: #111;
-      color: white;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
+<script>
+  const socket = io();
+  socket.emit("identify", "controller");
+
+  // Gửi lệnh thủ công vẫn giữ nguyên
+  function sendMove(direction) {
+    socket.emit("move", direction);
+  }
+
+  // Ngưỡng và thời gian cooldown để tránh gửi lệnh liên tục
+  const TILT_THRESHOLD = 15; // độ nghiêng tối thiểu để kích hoạt
+  const COOLDOWN = 500; // ms
+  let lastSent = { leftRight: 0, upDown: 0 };
+
+  window.addEventListener("deviceorientation", (event) => {
+    const gamma = event.gamma; // trái-phải (-90 to 90)
+    const beta = event.beta;   // trước-sau (-180 to 180)
+
+    const now = Date.now();
+
+    if (gamma > TILT_THRESHOLD && now - lastSent.leftRight > COOLDOWN) {
+      socket.emit("move", "right");
+      lastSent.leftRight = now;
+    } else if (gamma < -TILT_THRESHOLD && now - lastSent.leftRight > COOLDOWN) {
+      socket.emit("move", "left");
+      lastSent.leftRight = now;
     }
 
-    .controls {
-      display: grid;
-      grid-template-columns: repeat(3, 80px);
-      grid-gap: 10px;
-      margin-top: 20px;
+    if (beta > 90 + TILT_THRESHOLD && now - lastSent.upDown > COOLDOWN) {
+      socket.emit("move", "backward");
+      lastSent.upDown = now;
+    } else if (beta < 90 - TILT_THRESHOLD && now - lastSent.upDown > COOLDOWN) {
+      socket.emit("move", "forward");
+      lastSent.upDown = now;
     }
+  });
 
-    button {
-      padding: 20px;
-      font-size: 16px;
-      background-color: #333;
-      color: white;
-      border: none;
-      border-radius: 8px;
-    }
-
-    button:active {
-      background-color: #666;
-    }
-  </style>
-</head>
-<body>
-  <h2>🎮 Mobile Controller</h2>
-
-  <div class="controls">
-    <button onclick="sendMove('rotateLeft')">⟲</button>
-    <button onclick="sendMove('up')">⬆️</button>
-    <button onclick="sendMove('rotateRight')">⟳</button>
-
-    <button onclick="sendMove('left')">⬅️</button>
-    <button onclick="sendMove('forward')">⬆️🚶</button>
-    <button onclick="sendMove('right')">➡️</button>
-
-    <button onclick="sendMove('backward')">⬇️🚶</button>
-    <button onclick="sendMove('down')">⬇️</button>
-  </div>
-
-  <script>
-    const socket = io();
-
-    // Gửi định danh là controller
-    socket.emit("identify", "controller");
-
-    function sendMove(direction) {
-      socket.emit("move", direction);
-    }
-  </script>
-</body>
-</html>
+  // Cho phép người dùng cấp quyền truy cập sensor (đặc biệt trên iOS)
+  if (
+    typeof DeviceOrientationEvent !== "undefined" &&
+    typeof DeviceOrientationEvent.requestPermission === "function"
+  ) {
+    document.body.addEventListener("click", () => {
+      DeviceOrientationEvent.requestPermission().then((response) => {
+        if (response === "granted") {
+          console.log("Permission granted for motion.");
+        }
+      });
+    });
+  }
+</script>
 
