@@ -1,88 +1,56 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>3D Controller</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <style>
-    body {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      background: #111;
-      color: white;
-      font-family: sans-serif;
+<script>
+  const socket = io();
+  socket.emit("identify", "controller");
+
+  let gamma = 0, beta = 90;
+  const TILT_THRESHOLD = 10;
+  const sendInterval = 1000 / 60; // 60 FPS ~ 16.67ms
+  let lastSendTime = 0;
+
+  function handleOrientation(event) {
+    gamma = event.gamma;
+    beta = event.beta;
+  }
+
+  function sendMotionCommand() {
+    const now = performance.now();
+    if (now - lastSendTime < sendInterval) {
+      requestAnimationFrame(sendMotionCommand);
+      return;
     }
 
-    button {
-      padding: 12px 24px;
-      font-size: 18px;
-      border: none;
-      border-radius: 8px;
-      background: #00c853;
-      color: white;
-      cursor: pointer;
+    if (gamma > TILT_THRESHOLD) {
+      socket.emit("move", "right");
+    } else if (gamma < -TILT_THRESHOLD) {
+      socket.emit("move", "left");
     }
 
-    button:hover {
-      background: #00e676;
-    }
-  </style>
-</head>
-<body>
-  <h2>Mobile Controller</h2>
-  <button id="startBtn" onclick="initMotion()">Start Control</button>
-
-  <script src="/socket.io/socket.io.js"></script>
-  <script>
-    const socket = io();
-    socket.emit("identify", "controller");
-
-    const TILT_THRESHOLD = 15;
-    const COOLDOWN = 500;
-    let lastSent = { leftRight: 0, upDown: 0 };
-
-    function handleOrientation(event) {
-      const gamma = event.gamma;
-      const beta = event.beta;
-      const now = Date.now();
-
-      if (gamma > TILT_THRESHOLD && now - lastSent.leftRight > COOLDOWN) {
-        socket.emit("move", "right");
-        lastSent.leftRight = now;
-      } else if (gamma < -TILT_THRESHOLD && now - lastSent.leftRight > COOLDOWN) {
-        socket.emit("move", "left");
-        lastSent.leftRight = now;
-      }
-
-      if (beta > 90 + TILT_THRESHOLD && now - lastSent.upDown > COOLDOWN) {
-        socket.emit("move", "backward");
-        lastSent.upDown = now;
-      } else if (beta < 90 - TILT_THRESHOLD && now - lastSent.upDown > COOLDOWN) {
-        socket.emit("move", "forward");
-        lastSent.upDown = now;
-      }
+    if (beta > 90 + TILT_THRESHOLD) {
+      socket.emit("move", "backward");
+    } else if (beta < 90 - TILT_THRESHOLD) {
+      socket.emit("move", "forward");
     }
 
-    function initMotion() {
-      if (typeof DeviceOrientationEvent !== "undefined" &&
-          typeof DeviceOrientationEvent.requestPermission === "function") {
-        DeviceOrientationEvent.requestPermission().then(response => {
-          if (response === "granted") {
-            window.addEventListener("deviceorientation", handleOrientation);
-            document.getElementById("startBtn").style.display = "none";
-          }
-        });
-      } else {
-        window.addEventListener("deviceorientation", handleOrientation);
-        document.getElementById("startBtn").style.display = "none";
-      }
+    lastSendTime = now;
+    requestAnimationFrame(sendMotionCommand);
+  }
 
+  function initMotion() {
+    if (typeof DeviceOrientationEvent?.requestPermission === "function") {
+      DeviceOrientationEvent.requestPermission().then(response => {
+        if (response === "granted") {
+          window.addEventListener("deviceorientation", handleOrientation);
+          document.getElementById("startBtn").style.display = "none";
+          socket.emit("mobile-connected");
+          requestAnimationFrame(sendMotionCommand);
+        }
+      });
+    } else {
+      window.addEventListener("deviceorientation", handleOrientation);
+      document.getElementById("startBtn").style.display = "none";
       socket.emit("mobile-connected");
+      requestAnimationFrame(sendMotionCommand);
     }
-  </script>
-</body>
-</html>
+  }
+</script>
 
