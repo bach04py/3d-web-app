@@ -9,8 +9,8 @@
   <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/MTLLoader.js"></script>
   <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
 
-  <!-- Socket.IO Client -->
-  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <!-- Socket.IO -->
+  <script src="/socket.io/socket.io.js"></script>
 
   <style>
     body { margin: 0; overflow: hidden; background-color: black; }
@@ -32,8 +32,7 @@
   <div id="status">🔄 Waiting for controller...</div>
 
   <script>
-    let camera, scene, renderer;
-    let model;
+    let camera, scene, renderer, model;
     const keys = new Set();
     let useMobileControl = false;
     const rotation = { x: 0, y: 0 };
@@ -50,7 +49,6 @@
       renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setSize(window.innerWidth, window.innerHeight);
       renderer.shadowMap.enabled = true;
-      renderer.setClearColor(0x000000);
       document.body.appendChild(renderer.domElement);
 
       const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
@@ -59,18 +57,16 @@
       directionalLight.castShadow = true;
       scene.add(ambientLight, directionalLight);
 
-      // Load materials then model
       const mtlLoader = new THREE.MTLLoader();
       mtlLoader.setPath("/models/");
-      mtlLoader.load("building_04.mtl", function (materials) {
+      mtlLoader.load("building_04.mtl", (materials) => {
         materials.preload();
-
         const objLoader = new THREE.OBJLoader();
         objLoader.setMaterials(materials);
         objLoader.setPath("/models/");
-        objLoader.load("building_04.obj", function (obj) {
+        objLoader.load("building_04.obj", (obj) => {
           model = obj;
-          model.traverse((child) => {
+          model.traverse(child => {
             if (child.isMesh) {
               child.castShadow = true;
               child.receiveShadow = true;
@@ -87,8 +83,8 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
       });
 
-      window.addEventListener("keydown", (e) => keys.add(e.key.toLowerCase()));
-      window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
+      window.addEventListener("keydown", e => keys.add(e.key.toLowerCase()));
+      window.addEventListener("keyup", e => keys.delete(e.key.toLowerCase()));
 
       const socket = io();
       socket.emit("identify", "viewer");

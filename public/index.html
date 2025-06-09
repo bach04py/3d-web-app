@@ -19,7 +19,6 @@
       window.location.href = "/loadModel.html";
     }
 
-    // ✅ Tự động chuyển trang nếu có thiết bị mobile gửi "move"
     socket.on("mobile-connected", () => {
       console.log("📱 Mobile device connected. Switching to 3D viewer...");
       window.location.href = "/loadModel.html";
