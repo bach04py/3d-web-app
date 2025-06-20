@@ -15,7 +15,6 @@
       color: white;
       font-family: sans-serif;
       margin: 0;
-      padding: 0;
     }
 
     h2 {
@@ -38,112 +37,100 @@
     }
 
     .slider-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      margin-top: 10px;
       width: 80%;
       max-width: 300px;
+      text-align: center;
     }
 
-    .slider-container input {
+    input[type=range] {
       width: 100%;
     }
 
-    .slider-container label {
-      margin-top: 10px;
+    #log {
+      font-size: 12px;
+      margin-top: 12px;
+      color: #ccc;
     }
   </style>
 </head>
 <body>
   <h2>Mobile Controller</h2>
-  <button id="startBtn" onclick="initMotion()">Start Control</button>
+  <button id="startBtn">Start Control</button>
 
   <div class="slider-container">
     <label for="sensitivityRange">Sensitivity: <span id="sensitivityValue">15</span></label>
-    <input type="range" id="sensitivityRange" min="5" max="45" step="1" value="15">
+    <input type="range" id="sensitivityRange" min="5" max="45" value="15" />
   </div>
+
+  <div id="log"></div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
     socket.emit("identify", "controller");
 
-    let currentTilt = { gamma: 0, beta: 90 };
-    let accelerationZ = 9.8;
-    let lastDirection = "";
     let sensitivity = 15;
+    let lastDirection = "";
+    let gamma = 0, beta = 90;
 
-    const sensitivitySlider = document.getElementById("sensitivityRange");
-    const sensitivityDisplay = document.getElementById("sensitivityValue");
+    const logDiv = document.getElementById("log");
 
-    sensitivitySlider.addEventListener("input", () => {
-      sensitivity = parseInt(sensitivitySlider.value);
-      sensitivityDisplay.textContent = sensitivity;
-    });
-
-    function handleOrientation(event) {
-      currentTilt.gamma = event.gamma ?? 0;
-      currentTilt.beta = event.beta ?? 90;
-    }
-
-    function handleMotion(event) {
-      accelerationZ = event.accelerationIncludingGravity?.z ?? 9.8;
-    }
-
-    function determineDirection() {
-      const gamma = currentTilt.gamma;
-      const beta = currentTilt.beta;
-      const z = accelerationZ;
-
+    function determineDirection(gamma, beta, sensitivity) {
       if (gamma > sensitivity) return "right";
       if (gamma < -sensitivity) return "left";
       if (beta > 90 + sensitivity) return "backward";
       if (beta < 90 - sensitivity) return "forward";
-      if (z > 12.5) return "up";
-      if (z < 7) return "down";
       return "";
     }
 
-    function sendMotion() {
-      const dir = determineDirection();
-      if (dir && dir !== lastDirection) {
-        socket.emit("move", { dir, speed: 1 }); // có thể thêm speed tuỳ cảm biến
-        lastDirection = dir;
-      } else if (!dir) {
+    function sendDirection() {
+      const direction = determineDirection(gamma, beta, sensitivity);
+      if (direction && direction !== lastDirection) {
+        socket.emit("move", direction);
+        logDiv.innerText = `Direction: ${direction}`;
+        lastDirection = direction;
+      } else if (!direction) {
         lastDirection = "";
+        logDiv.innerText = `Direction: idle`;
       }
-
-      requestAnimationFrame(sendMotion);
+      requestAnimationFrame(sendDirection);
     }
 
-    function initMotion() {
-      function startSensors() {
-        window.addEventListener("deviceorientation", handleOrientation);
-        window.addEventListener("devicemotion", handleMotion);
-        document.getElementById("startBtn").style.display = "none";
-        socket.emit("mobile-connected");
-        requestAnimationFrame(sendMotion);
-      }
+    function startControl() {
+      document.getElementById("startBtn").style.display = "none";
+      window.addEventListener("deviceorientation", (event) => {
+        gamma = event.gamma ?? 0;
+        beta = event.beta ?? 90;
+      });
+      requestAnimationFrame(sendDirection);
+    }
 
+    async function initMotion() {
       if (typeof DeviceOrientationEvent?.requestPermission === "function") {
-        DeviceOrientationEvent.requestPermission().then(response => {
-          if (response === "granted") {
-            DeviceMotionEvent.requestPermission().then(r2 => {
-              if (r2 === "granted") {
-                startSensors();
-              } else {
-                alert("Bạn cần cấp quyền truy cập cảm biến chuyển động.");
-              }
-            });
+        try {
+          const perm = await DeviceOrientationEvent.requestPermission();
+          if (perm === "granted") {
+            startControl();
+            socket.emit("mobile-connected");
           } else {
-            alert("Bạn cần cấp quyền truy cập cảm biến định hướng.");
+            alert("Bạn cần cấp quyền cảm biến.");
           }
-        });
+        } catch (err) {
+          alert("Trình duyệt không hỗ trợ cảm biến hoặc bị từ chối.");
+        }
       } else {
-        startSensors();
+        // Android và trình duyệt đã có quyền sẵn
+        startControl();
+        socket.emit("mobile-connected");
       }
     }
+
+    document.getElementById("startBtn").onclick = initMotion;
+
+    document.getElementById("sensitivityRange").oninput = (e) => {
+      sensitivity = parseInt(e.target.value);
+      document.getElementById("sensitivityValue").innerText = sensitivity;
+    };
   </script>
 </body>
 </html>
