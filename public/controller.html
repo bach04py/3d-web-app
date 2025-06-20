@@ -40,6 +40,7 @@
       width: 80%;
       max-width: 300px;
       text-align: center;
+      margin-bottom: 12px;
     }
 
     input[type=range] {
@@ -47,9 +48,11 @@
     }
 
     #log {
-      font-size: 12px;
+      font-size: 13px;
       margin-top: 12px;
       color: #ccc;
+      max-width: 300px;
+      text-align: center;
     }
   </style>
 </head>
@@ -62,7 +65,7 @@
     <input type="range" id="sensitivityRange" min="5" max="45" value="15" />
   </div>
 
-  <div id="log"></div>
+  <div id="log">Direction: idle</div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
@@ -71,27 +74,29 @@
 
     let sensitivity = 15;
     let lastDirection = "";
-    let gamma = 0, beta = 90;
+    let gamma = 0, beta = 90, alpha = 0;
 
     const logDiv = document.getElementById("log");
 
-    function determineDirection(gamma, beta, sensitivity) {
+    function determineDirection(gamma, beta, alpha, sensitivity) {
       if (gamma > sensitivity) return "right";
       if (gamma < -sensitivity) return "left";
       if (beta > 90 + sensitivity) return "backward";
       if (beta < 90 - sensitivity) return "forward";
+      if (alpha > 180 + sensitivity / 2) return "down";
+      if (alpha < 180 - sensitivity / 2) return "up";
       return "";
     }
 
     function sendDirection() {
-      const direction = determineDirection(gamma, beta, sensitivity);
+      const direction = determineDirection(gamma, beta, alpha, sensitivity);
       if (direction && direction !== lastDirection) {
         socket.emit("move", direction);
         logDiv.innerText = `Direction: ${direction}`;
         lastDirection = direction;
       } else if (!direction) {
         lastDirection = "";
-        logDiv.innerText = `Direction: idle`;
+        logDiv.innerText = "Direction: idle";
       }
       requestAnimationFrame(sendDirection);
     }
@@ -101,27 +106,26 @@
       window.addEventListener("deviceorientation", (event) => {
         gamma = event.gamma ?? 0;
         beta = event.beta ?? 90;
+        alpha = event.alpha ?? 180;
       });
+      socket.emit("mobile-connected");
       requestAnimationFrame(sendDirection);
     }
 
     async function initMotion() {
       if (typeof DeviceOrientationEvent?.requestPermission === "function") {
         try {
-          const perm = await DeviceOrientationEvent.requestPermission();
-          if (perm === "granted") {
+          const response = await DeviceOrientationEvent.requestPermission();
+          if (response === "granted") {
             startControl();
-            socket.emit("mobile-connected");
           } else {
-            alert("Bạn cần cấp quyền cảm biến.");
+            alert("Permission denied.");
           }
         } catch (err) {
-          alert("Trình duyệt không hỗ trợ cảm biến hoặc bị từ chối.");
+          alert("Device orientation not supported.");
         }
       } else {
-        // Android và trình duyệt đã có quyền sẵn
         startControl();
-        socket.emit("mobile-connected");
       }
     }
 
