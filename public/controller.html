@@ -14,6 +14,7 @@
       background: #111;
       color: white;
       font-family: sans-serif;
+      text-align: center;
     }
 
     button {
@@ -24,15 +25,38 @@
       background: #00c853;
       color: white;
       cursor: pointer;
+      margin: 16px;
     }
 
     button:hover {
       background: #00e676;
     }
+
+    .slider-container {
+      width: 80%;
+      max-width: 400px;
+      margin: 16px;
+    }
+
+    input[type=range] {
+      width: 100%;
+    }
+
+    label {
+      margin-bottom: 4px;
+      display: block;
+    }
   </style>
 </head>
 <body>
   <h2>Mobile Controller</h2>
+  <p>Nghiêng điện thoại để điều khiển mô hình 3D</p>
+
+  <div class="slider-container">
+    <label for="sensitivity">Độ nhạy: <span id="sensitivityValue">45</span></label>
+    <input type="range" id="sensitivity" min="10" max="90" value="45" step="1">
+  </div>
+
   <button id="startBtn" onclick="initMotion()">Start Control</button>
 
   <script src="/socket.io/socket.io.js"></script>
@@ -40,31 +64,44 @@
     const socket = io();
     socket.emit("identify", "controller");
 
-    const TILT_THRESHOLD = 15;
     let currentTilt = { gamma: 0, beta: 90 };
-    let lastDirection = "";
+    let sensitivity = 45;
+
+    const NEUTRAL_ZONE = 3;
+    const sensitivitySlider = document.getElementById("sensitivity");
+    const sensitivityLabel = document.getElementById("sensitivityValue");
+
+    sensitivitySlider.oninput = () => {
+      sensitivity = parseInt(sensitivitySlider.value);
+      sensitivityLabel.textContent = sensitivity;
+    };
 
     function handleOrientation(event) {
-      currentTilt.gamma = event.gamma;
-      currentTilt.beta = event.beta;
+      currentTilt.gamma = event.gamma || 0;
+      currentTilt.beta = event.beta || 90;
     }
 
-    function determineDirection(gamma, beta) {
-      if (gamma > TILT_THRESHOLD) return "right";
-      if (gamma < -TILT_THRESHOLD) return "left";
-      if (beta > 90 + TILT_THRESHOLD) return "backward";
-      if (beta < 90 - TILT_THRESHOLD) return "forward";
-      return "";
+    function normalizeAngle(angle) {
+      if (Math.abs(angle) < NEUTRAL_ZONE) return 0;
+      return Math.max(-1, Math.min(1, angle / sensitivity));
     }
 
     function sendMotion() {
-      const dir = determineDirection(currentTilt.gamma, currentTilt.beta);
-      if (dir && dir !== lastDirection) {
-        socket.emit("move", dir);
-        lastDirection = dir;
-      } else if (!dir) {
-        lastDirection = "";
+      const gammaNorm = normalizeAngle(currentTilt.gamma);
+      const betaNorm = normalizeAngle(currentTilt.beta - 90);
+
+      if (gammaNorm < -0.1) {
+        socket.emit("move", { dir: "left", speed: Math.abs(gammaNorm) });
+      } else if (gammaNorm > 0.1) {
+        socket.emit("move", { dir: "right", speed: Math.abs(gammaNorm) });
       }
+
+      if (betaNorm < -0.1) {
+        socket.emit("move", { dir: "forward", speed: Math.abs(betaNorm) });
+      } else if (betaNorm > 0.1) {
+        socket.emit("move", { dir: "backward", speed: Math.abs(betaNorm) });
+      }
+
       requestAnimationFrame(sendMotion);
     }
 
