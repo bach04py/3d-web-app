@@ -25,38 +25,17 @@
       background: #00c853;
       color: white;
       cursor: pointer;
-      margin: 16px;
+      margin-top: 20px;
     }
 
     button:hover {
       background: #00e676;
     }
-
-    .slider-container {
-      width: 80%;
-      max-width: 400px;
-      margin: 16px;
-    }
-
-    input[type=range] {
-      width: 100%;
-    }
-
-    label {
-      margin-bottom: 4px;
-      display: block;
-    }
   </style>
 </head>
 <body>
   <h2>Mobile Controller</h2>
-  <p>Nghiêng điện thoại để điều khiển mô hình 3D</p>
-
-  <div class="slider-container">
-    <label for="sensitivity">Độ nhạy: <span id="sensitivityValue">45</span></label>
-    <input type="range" id="sensitivity" min="10" max="90" value="45" step="1">
-  </div>
-
+  <p>Nghiêng điện thoại để điều khiển mô hình 3D.</p>
   <button id="startBtn" onclick="initMotion()">Start Control</button>
 
   <script src="/socket.io/socket.io.js"></script>
@@ -64,42 +43,56 @@
     const socket = io();
     socket.emit("identify", "controller");
 
-    let currentTilt = { gamma: 0, beta: 90 };
-    let sensitivity = 45;
-
+    const TILT_THRESHOLD = 5;
     const NEUTRAL_ZONE = 3;
-    const sensitivitySlider = document.getElementById("sensitivity");
-    const sensitivityLabel = document.getElementById("sensitivityValue");
-
-    sensitivitySlider.oninput = () => {
-      sensitivity = parseInt(sensitivitySlider.value);
-      sensitivityLabel.textContent = sensitivity;
-    };
+    const MAX_ANGLE = 45;
+    let currentTilt = { gamma: 0, beta: 90 };
+    let accelerationZ = 0;
+    let lastDirection = "";
 
     function handleOrientation(event) {
       currentTilt.gamma = event.gamma || 0;
       currentTilt.beta = event.beta || 90;
     }
 
+    function handleMotion(event) {
+      if (event.accelerationIncludingGravity?.z !== undefined) {
+        accelerationZ = event.accelerationIncludingGravity.z;
+      }
+    }
+
     function normalizeAngle(angle) {
       if (Math.abs(angle) < NEUTRAL_ZONE) return 0;
-      return Math.max(-1, Math.min(1, angle / sensitivity));
+      return Math.max(-1, Math.min(1, angle / MAX_ANGLE));
     }
 
     function sendMotion() {
       const gammaNorm = normalizeAngle(currentTilt.gamma);
       const betaNorm = normalizeAngle(currentTilt.beta - 90);
+      const zNorm = accelerationZ;
+
+      let dir = "";
+      let speed = 0;
 
       if (gammaNorm < -0.1) {
-        socket.emit("move", { dir: "left", speed: Math.abs(gammaNorm) });
+        dir = "left"; speed = Math.abs(gammaNorm);
       } else if (gammaNorm > 0.1) {
-        socket.emit("move", { dir: "right", speed: Math.abs(gammaNorm) });
+        dir = "right"; speed = Math.abs(gammaNorm);
+      } else if (betaNorm < -0.1) {
+        dir = "forward"; speed = Math.abs(betaNorm);
+      } else if (betaNorm > 0.1) {
+        dir = "backward"; speed = Math.abs(betaNorm);
+      } else if (zNorm > 12) {
+        dir = "up"; speed = Math.min((zNorm - 9.8) / 5, 1);
+      } else if (zNorm < 7) {
+        dir = "down"; speed = Math.min((9.8 - zNorm) / 5, 1);
       }
 
-      if (betaNorm < -0.1) {
-        socket.emit("move", { dir: "forward", speed: Math.abs(betaNorm) });
-      } else if (betaNorm > 0.1) {
-        socket.emit("move", { dir: "backward", speed: Math.abs(betaNorm) });
+      if (dir && dir !== lastDirection) {
+        socket.emit("move", { dir, speed });
+        lastDirection = dir;
+      } else if (!dir) {
+        lastDirection = "";
       }
 
       requestAnimationFrame(sendMotion);
@@ -107,9 +100,13 @@
 
     function initMotion() {
       if (typeof DeviceOrientationEvent?.requestPermission === "function") {
-        DeviceOrientationEvent.requestPermission().then(response => {
-          if (response === "granted") {
+        Promise.all([
+          DeviceOrientationEvent.requestPermission(),
+          DeviceMotionEvent.requestPermission()
+        ]).then(([oriPerm, motPerm]) => {
+          if (oriPerm === "granted" && motPerm === "granted") {
             window.addEventListener("deviceorientation", handleOrientation);
+            window.addEventListener("devicemotion", handleMotion);
             document.getElementById("startBtn").style.display = "none";
             socket.emit("mobile-connected");
             requestAnimationFrame(sendMotion);
@@ -117,6 +114,7 @@
         });
       } else {
         window.addEventListener("deviceorientation", handleOrientation);
+        window.addEventListener("devicemotion", handleMotion);
         document.getElementById("startBtn").style.display = "none";
         socket.emit("mobile-connected");
         requestAnimationFrame(sendMotion);
