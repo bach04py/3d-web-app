@@ -59,24 +59,24 @@
     socket.emit("identify", "controller");
 
     let sensitivity = 15;
-    let accelThreshold = 2; // ngưỡng gia tốc m/s² cho lên/xuống
+    let accelThreshold = 3; // ngưỡng để phân biệt rõ ràng nâng/hạ
     let lastDirection = "";
     let gamma = 0, beta = 90;
-    let accZ = 0;
+    let accY = 0;
     const logDiv = document.getElementById("log");
 
-    function determineDirection(gamma, beta, accZ, sensitivity, accelThreshold) {
+    function determineDirection(gamma, beta, accY, sensitivity, accelThreshold) {
       if (gamma > sensitivity) return "right";
       if (gamma < -sensitivity) return "left";
       if (beta > 90 + sensitivity) return "backward";
       if (beta < 90 - sensitivity) return "forward";
-      if (accZ > accelThreshold) return "up";
-      if (accZ < -accelThreshold) return "down";
+      if (accY < -accelThreshold) return "up";     // nâng điện thoại
+      if (accY > accelThreshold) return "down";    // hạ điện thoại
       return "";
     }
 
     function sendDirection() {
-      const direction = determineDirection(gamma, beta, accZ, sensitivity, accelThreshold);
+      const direction = determineDirection(gamma, beta, accY, sensitivity, accelThreshold);
       if (direction && direction !== lastDirection) {
         socket.emit("move", direction);
         logDiv.innerText = `Direction: ${direction}`;
@@ -95,7 +95,7 @@
         beta = e.beta ?? 90;
       });
       window.addEventListener("devicemotion", e => {
-        accZ = e.accelerationIncludingGravity?.z ?? 0;
+        accY = e.accelerationIncludingGravity?.y ?? 0;
       });
       socket.emit("mobile-connected");
       requestAnimationFrame(sendDirection);
