@@ -16,11 +16,7 @@
       font-family: sans-serif;
       margin: 0;
     }
-
-    h2 {
-      margin-bottom: 16px;
-    }
-
+    h2 { margin-bottom: 16px; }
     button {
       padding: 12px 24px;
       font-size: 18px;
@@ -31,22 +27,14 @@
       cursor: pointer;
       margin-bottom: 20px;
     }
-
-    button:hover {
-      background: #00e676;
-    }
-
+    button:hover { background: #00e676; }
     .slider-container {
       width: 80%;
       max-width: 300px;
       text-align: center;
       margin-bottom: 12px;
     }
-
-    input[type=range] {
-      width: 100%;
-    }
-
+    input[type=range] { width: 100%; }
     #log {
       font-size: 13px;
       margin-top: 12px;
@@ -59,12 +47,10 @@
 <body>
   <h2>Mobile Controller</h2>
   <button id="startBtn">Start Control</button>
-
   <div class="slider-container">
     <label for="sensitivityRange">Sensitivity: <span id="sensitivityValue">15</span></label>
     <input type="range" id="sensitivityRange" min="5" max="45" value="15" />
   </div>
-
   <div id="log">Direction: idle</div>
 
   <script src="/socket.io/socket.io.js"></script>
@@ -73,23 +59,24 @@
     socket.emit("identify", "controller");
 
     let sensitivity = 15;
+    let accelThreshold = 2; // ngưỡng gia tốc m/s² cho lên/xuống
     let lastDirection = "";
-    let gamma = 0, beta = 90, alpha = 0;
-
+    let gamma = 0, beta = 90;
+    let accZ = 0;
     const logDiv = document.getElementById("log");
 
-    function determineDirection(gamma, beta, alpha, sensitivity) {
+    function determineDirection(gamma, beta, accZ, sensitivity, accelThreshold) {
       if (gamma > sensitivity) return "right";
       if (gamma < -sensitivity) return "left";
       if (beta > 90 + sensitivity) return "backward";
       if (beta < 90 - sensitivity) return "forward";
-      if (alpha > 180 + sensitivity / 2) return "down";
-      if (alpha < 180 - sensitivity / 2) return "up";
+      if (accZ > accelThreshold) return "up";
+      if (accZ < -accelThreshold) return "down";
       return "";
     }
 
     function sendDirection() {
-      const direction = determineDirection(gamma, beta, alpha, sensitivity);
+      const direction = determineDirection(gamma, beta, accZ, sensitivity, accelThreshold);
       if (direction && direction !== lastDirection) {
         socket.emit("move", direction);
         logDiv.innerText = `Direction: ${direction}`;
@@ -103,10 +90,12 @@
 
     function startControl() {
       document.getElementById("startBtn").style.display = "none";
-      window.addEventListener("deviceorientation", (event) => {
-        gamma = event.gamma ?? 0;
-        beta = event.beta ?? 90;
-        alpha = event.alpha ?? 180;
+      window.addEventListener("deviceorientation", e => {
+        gamma = e.gamma ?? 0;
+        beta = e.beta ?? 90;
+      });
+      window.addEventListener("devicemotion", e => {
+        accZ = e.accelerationIncludingGravity?.z ?? 0;
       });
       socket.emit("mobile-connected");
       requestAnimationFrame(sendDirection);
@@ -130,7 +119,6 @@
     }
 
     document.getElementById("startBtn").onclick = initMotion;
-
     document.getElementById("sensitivityRange").oninput = (e) => {
       sensitivity = parseInt(e.target.value);
       document.getElementById("sensitivityValue").innerText = sensitivity;
