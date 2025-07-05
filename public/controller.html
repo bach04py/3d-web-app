@@ -16,7 +16,9 @@
       font-family: sans-serif;
       margin: 0;
     }
-    h2 { margin-bottom: 16px; }
+    h2 {
+      margin-bottom: 16px;
+    }
     button {
       padding: 12px 24px;
       font-size: 18px;
@@ -27,14 +29,18 @@
       cursor: pointer;
       margin-bottom: 20px;
     }
-    button:hover { background: #00e676; }
+    button:hover {
+      background: #00e676;
+    }
     .slider-container {
       width: 80%;
       max-width: 300px;
       text-align: center;
       margin-bottom: 12px;
     }
-    input[type=range] { width: 100%; }
+    input[type=range] {
+      width: 100%;
+    }
     #log {
       font-size: 13px;
       margin-top: 12px;
@@ -47,10 +53,12 @@
 <body>
   <h2>Mobile Controller</h2>
   <button id="startBtn">Start Control</button>
+
   <div class="slider-container">
     <label for="sensitivityRange">Sensitivity: <span id="sensitivityValue">15</span></label>
     <input type="range" id="sensitivityRange" min="5" max="45" value="15" />
   </div>
+
   <div id="log">Direction: idle</div>
 
   <script src="/socket.io/socket.io.js"></script>
@@ -59,46 +67,63 @@
     socket.emit("identify", "controller");
 
     let sensitivity = 15;
-    let accelThreshold = 3; // ngưỡng để phân biệt rõ ràng nâng/hạ
+    let accelThreshold = 3;
+    let gamma = 0, beta = 90, accY = 0;
     let lastDirection = "";
-    let gamma = 0, beta = 90;
-    let accY = 0;
+    let lastEmit = 0;
+
     const logDiv = document.getElementById("log");
+    const SMOOTH_COUNT = 5;
+    const COOLDOWN_MS = 500;
+
+    const smooth = { gamma: [], beta: [], accY: [] };
+
+    function smoothValue(arr, newVal) {
+      arr.push(newVal);
+      if (arr.length > SMOOTH_COUNT) arr.shift();
+      return arr.reduce((a, b) => a + b, 0) / arr.length;
+    }
 
     function determineDirection(gamma, beta, accY, sensitivity, accelThreshold) {
       if (gamma > sensitivity) return "right";
       if (gamma < -sensitivity) return "left";
       if (beta > 90 + sensitivity) return "backward";
       if (beta < 90 - sensitivity) return "forward";
-      if (accY < -accelThreshold) return "up";     // nâng điện thoại
-      if (accY > accelThreshold) return "down";    // hạ điện thoại
+      if (accY < -accelThreshold) return "up";
+      if (accY > accelThreshold) return "down";
       return "";
     }
 
     function sendDirection() {
+      const now = Date.now();
       const direction = determineDirection(gamma, beta, accY, sensitivity, accelThreshold);
-      if (direction && direction !== lastDirection) {
+
+      if (direction && direction !== lastDirection && now - lastEmit > COOLDOWN_MS) {
         socket.emit("move", direction);
         logDiv.innerText = `Direction: ${direction}`;
         lastDirection = direction;
-      } else if (!direction) {
+        lastEmit = now;
+      } else if (!direction && lastDirection) {
         lastDirection = "";
         logDiv.innerText = "Direction: idle";
       }
-      requestAnimationFrame(sendDirection);
     }
 
     function startControl() {
       document.getElementById("startBtn").style.display = "none";
+
       window.addEventListener("deviceorientation", e => {
-        gamma = e.gamma ?? 0;
-        beta = e.beta ?? 90;
+        gamma = smoothValue(smooth.gamma, e.gamma ?? 0);
+        beta = smoothValue(smooth.beta, e.beta ?? 90);
       });
+
       window.addEventListener("devicemotion", e => {
-        accY = e.accelerationIncludingGravity?.y ?? 0;
+        accY = smoothValue(smooth.accY, e.accelerationIncludingGravity?.y ?? 0);
       });
+
       socket.emit("mobile-connected");
-      requestAnimationFrame(sendDirection);
+
+      setInterval(sendDirection, 100); // kiểm tra hướng mỗi 100ms
     }
 
     async function initMotion() {
@@ -119,6 +144,7 @@
     }
 
     document.getElementById("startBtn").onclick = initMotion;
+
     document.getElementById("sensitivityRange").oninput = (e) => {
       sensitivity = parseInt(e.target.value);
       document.getElementById("sensitivityValue").innerText = sensitivity;
